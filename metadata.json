@@ -1,0 +1,7 @@
+{
+  "name": "BookWise Library Scanner",
+  "description": "A web application to scan book ISBN barcodes, fetch details from the Google Books API, and catalog them with personal notes. This version saves the library in your browser; full Google Sheets integration would require a backend service like Google Apps Script for security.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
