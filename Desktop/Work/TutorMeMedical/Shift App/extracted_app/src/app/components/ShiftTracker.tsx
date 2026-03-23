@@ -100,7 +100,7 @@ export function ShiftTracker() {
 
   // Rooms
   const [rooms, setRooms] = useState<RoomData[]>([{
-    id: '1', roomNumber: '', hourlyData: {}, intake: '', output: '',
+    id: '1', roomNumber: '', hourlyData: {}, completedSlots: {}, intake: '', output: '',
     documentation: freshDocs(),
   }]);
 
@@ -259,7 +259,7 @@ export function ShiftTracker() {
   }, []);
 
   const addRoom = useCallback(() => setRooms(prev => [...prev, {
-    id: Date.now().toString(), roomNumber: '', hourlyData: {}, intake: '', output: '',
+    id: Date.now().toString(), roomNumber: '', hourlyData: {}, completedSlots: {}, intake: '', output: '',
     documentation: freshDocs(),
   }]), [freshDocs]);
 
