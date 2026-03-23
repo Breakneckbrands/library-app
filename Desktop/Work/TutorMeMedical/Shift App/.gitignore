@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.DS_Store
+*.zip
+*.make
+.claude/worktrees/
+
+# iOS build artifacts
+extracted_app/ios/App/Pods/
+extracted_app/ios/App/App/public/
+extracted_app/ios/capacitor-cordova-ios-plugins/
