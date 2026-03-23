@@ -99,10 +99,7 @@ export function ShiftTracker() {
   const [lastReminderHour, setLastReminderHour] = useState<number | null>(null);
 
   // Rooms
-  const [rooms, setRooms] = useState<RoomData[]>([{
-    id: '1', roomNumber: '', hourlyData: {}, completedSlots: {}, intake: '', output: '',
-    documentation: freshDocs(),
-  }]);
+  const [rooms, setRooms] = useState<RoomData[]>([]);
 
   // Timers & Alerts
   const [showTimersMenu, setShowTimersMenu] = useState(false);
@@ -229,10 +226,7 @@ export function ShiftTracker() {
     setStartTime(new Date());
     setLastReminderHour(null);
     toast.success('Shift started!');
-    if (rooms.length === 1 && !rooms[0].roomNumber) {
-      setRooms([{ ...rooms[0], documentation: freshDocs() }]);
-    }
-  }, [rooms, freshDocs]);
+  }, []);
 
   const endShift = useCallback(() => {
     if (!window.confirm('End this shift? All data will be cleared.')) return;
@@ -240,7 +234,7 @@ export function ShiftTracker() {
     setStartTime(null);
     setElapsedTime('00:00');
     setLastReminderHour(null);
-    setRooms([{ id: '1', roomNumber: '', hourlyData: {}, completedSlots: {}, intake: '', output: '', documentation: freshDocs() }]);
+    setRooms([]);
     setCustomTimers([]);
     setLunchStartTime(null);
     setScheduledAlerts([]);
@@ -279,9 +273,8 @@ export function ShiftTracker() {
   }, [newRoomNumber, freshDocs]);
 
   const removeRoom = useCallback((id: string) => {
-    if (rooms.length === 1) { toast.error('Must have at least one room'); return; }
     setRooms(rooms => rooms.filter(r => r.id !== id));
-  }, [rooms.length]);
+  }, []);
 
   const updateRoom = useCallback((id: string, updates: Partial<RoomData>) =>
     setRooms(rooms => rooms.map(r => r.id === id ? { ...r, ...updates } : r)), []);
@@ -475,6 +468,7 @@ export function ShiftTracker() {
               <input
                 autoFocus
                 type="text"
+                inputMode="numeric"
                 value={newRoomNumber}
                 onChange={e => setNewRoomNumber(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') submitAddRoom(); if (e.key === 'Escape') setShowAddRoomModal(false); }}
@@ -639,7 +633,7 @@ export function ShiftTracker() {
                   onUpdateRoom={updateRoom}
                   onUpdateHourlyData={updateHourlyData}
                   onRemoveRoom={removeRoom}
-                  canRemoveRoom={rooms.length > 1}
+                  canRemoveRoom={true}
                 />
               ))}
             </div>

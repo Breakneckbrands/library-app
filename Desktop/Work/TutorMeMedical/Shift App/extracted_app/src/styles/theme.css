@@ -119,6 +119,12 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* Prevent iOS Safari from auto-zooming when tapping inputs.
+   Must be outside @layer so it wins over Tailwind utility classes (text-sm etc). */
+input, textarea, select {
+  font-size: max(16px, 1em) !important;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -174,7 +180,7 @@
   }
 
   input, textarea, select {
-    font-size: max(16px, var(--text-base));
+    font-size: var(--text-base);
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
   }
