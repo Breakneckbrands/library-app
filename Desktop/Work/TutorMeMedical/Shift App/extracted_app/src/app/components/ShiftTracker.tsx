@@ -240,12 +240,13 @@ export function ShiftTracker() {
     setStartTime(null);
     setElapsedTime('00:00');
     setLastReminderHour(null);
+    setRooms([{ id: '1', roomNumber: '', hourlyData: {}, completedSlots: {}, intake: '', output: '', documentation: freshDocs() }]);
     setCustomTimers([]);
     setLunchStartTime(null);
     setScheduledAlerts([]);
     localStorage.removeItem('shiftData');
     toast.success('Shift ended. Stay safe!');
-  }, []);
+  }, [freshDocs]);
 
   const toggleDoc = useCallback((roomId: string, docId: string, parentId?: string) => {
     setRooms(rooms => rooms.map(room => {
