@@ -122,6 +122,10 @@ export function ShiftTracker() {
   const [alertLabel, setAlertLabel] = useState('');
   const [alertDateTime, setAlertDateTime] = useState('');
 
+  // Add Room modal
+  const [showAddRoomModal, setShowAddRoomModal] = useState(false);
+  const [newRoomNumber, setNewRoomNumber] = useState('');
+
   // Load shift data
   useEffect(() => {
     const saved = localStorage.getItem('shiftData');
@@ -258,10 +262,20 @@ export function ShiftTracker() {
     }));
   }, []);
 
-  const addRoom = useCallback(() => setRooms(prev => [...prev, {
-    id: Date.now().toString(), roomNumber: '', hourlyData: {}, completedSlots: {}, intake: '', output: '',
-    documentation: freshDocs(),
-  }]), [freshDocs]);
+  const addRoom = useCallback(() => {
+    setNewRoomNumber('');
+    setShowAddRoomModal(true);
+  }, []);
+
+  const submitAddRoom = useCallback(() => {
+    setRooms(prev => [...prev, {
+      id: Date.now().toString(),
+      roomNumber: newRoomNumber.trim(),
+      hourlyData: {}, completedSlots: {}, intake: '', output: '',
+      documentation: freshDocs(),
+    }]);
+    setShowAddRoomModal(false);
+  }, [newRoomNumber, freshDocs]);
 
   const removeRoom = useCallback((id: string) => {
     if (rooms.length === 1) { toast.error('Must have at least one room'); return; }
@@ -351,7 +365,7 @@ export function ShiftTracker() {
   const pendingAlerts = scheduledAlerts.filter(a => !a.fired);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
 
       {showSettingsModal && (
         <SettingsModal
@@ -450,28 +464,60 @@ export function ShiftTracker() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-3 sm:px-6 py-3 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-[1800px] mx-auto space-y-2">
+      {/* Add Room Modal */}
+      {showAddRoomModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xs p-6 space-y-4">
+            <h2 className="text-lg font-bold text-gray-800">Add Room</h2>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Room Number</label>
+              <input
+                autoFocus
+                type="text"
+                value={newRoomNumber}
+                onChange={e => setNewRoomNumber(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') submitAddRoom(); if (e.key === 'Escape') setShowAddRoomModal(false); }}
+                placeholder="e.g. 401, 402B"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setShowAddRoomModal(false)}
+                className="flex-1 border border-gray-300 text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-50">
+                Cancel
+              </button>
+              <button onClick={submitAddRoom}
+                className="flex-1 bg-indigo-500 text-white py-2 rounded-lg text-sm font-semibold hover:bg-indigo-600">
+                Add Room
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header — safe-area-inset-top keeps it below iOS status bar */}
+      <div className="bg-white border-b border-gray-200 px-3 sticky top-0 z-10 shadow-sm"
+        style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
+        <div className="pb-2 space-y-2">
 
           {/* Top row: logo + actions */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="bg-indigo-100 p-1.5 rounded-lg flex items-center justify-center w-8 h-8">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="bg-indigo-100 p-1.5 rounded-lg flex items-center justify-center w-8 h-8 flex-shrink-0">
                 <img src="/logo.png" alt="" className="w-5 h-5 object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling!.classList.remove('hidden') }} />
                 <Clock className="w-4 h-4 text-indigo-600 hidden" />
               </div>
-              <div>
-                <h1 className="text-base sm:text-xl font-bold text-gray-800 leading-tight">Medical Shift Tracker</h1>
+              <div className="min-w-0">
+                <h1 className="text-sm font-bold text-gray-800 leading-tight truncate">Medical Shift Tracker</h1>
                 {shiftStarted && startTime && (
-                  <p className="text-xs text-gray-400">
+                  <p className="text-[11px] text-gray-400">
                     Started {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 )}
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               <button onClick={() => setShowSettingsModal(true)}
                 className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors" title="Settings">
                 <Settings className="w-5 h-5" />
@@ -481,8 +527,8 @@ export function ShiftTracker() {
                 <>
                   <div className="relative">
                     <button onClick={() => setShowTimersMenu(m => !m)}
-                      className="flex items-center gap-1.5 bg-purple-500 text-white px-3 py-1.5 rounded-lg hover:bg-purple-600 transition-all text-sm">
-                      <Timer className="w-4 h-4" /> <span className="hidden sm:inline">Timers</span> <ChevronDown className="w-3 h-3" />
+                      className="flex items-center gap-1 bg-purple-500 text-white px-2.5 py-1.5 rounded-lg hover:bg-purple-600 transition-all text-xs font-medium">
+                      <Timer className="w-3.5 h-3.5" /> <ChevronDown className="w-3 h-3" />
                     </button>
                     {showTimersMenu && (
                       <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg py-2 w-52 z-20">
@@ -504,14 +550,14 @@ export function ShiftTracker() {
                     )}
                   </div>
                   <button onClick={endShift}
-                    className="bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 transition-all text-sm">
+                    className="bg-red-500 text-white px-2.5 py-1.5 rounded-lg hover:bg-red-600 transition-all text-xs font-medium">
                     End Shift
                   </button>
                 </>
               )}
               {!shiftStarted && (
                 <button onClick={startShift}
-                  className="bg-indigo-500 text-white px-5 py-2 rounded-lg hover:bg-indigo-600 transition-all font-semibold text-sm">
+                  className="bg-indigo-500 text-white px-4 py-1.5 rounded-lg hover:bg-indigo-600 transition-all font-semibold text-sm">
                   Start Shift
                 </button>
               )}
@@ -582,7 +628,7 @@ export function ShiftTracker() {
                 <Plus className="w-4 h-4" /> Add Room
               </button>
             </div>
-            <div className="space-y-6">
+            <div className="space-y-3">
               {rooms.map(room => (
                 <RoomPanel
                   key={room.id}
