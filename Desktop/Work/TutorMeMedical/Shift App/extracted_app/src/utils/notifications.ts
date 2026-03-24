@@ -73,6 +73,52 @@ export async function triggerVibration(type: 'alarm' | 'reminder' = 'alarm'): Pr
   }
 }
 
+/**
+ * Pre-schedule a native iOS notification for a specific future time.
+ * Returns the native notification ID (for later cancellation).
+ * This fires even when the app is backgrounded or the phone is locked.
+ */
+export async function scheduleNativeAlert(id: number, title: string, body: string, at: Date): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    await LocalNotifications.schedule({
+      notifications: [{
+        title,
+        body,
+        id,
+        schedule: { at },
+        sound: 'default',
+        threadIdentifier: 'shift-tracker-alerts',
+      }]
+    });
+  } catch (e) {
+    console.warn('Failed to pre-schedule native notification:', e);
+  }
+}
+
+/** Cancel a previously pre-scheduled native notification by its ID. */
+export async function cancelNativeAlert(id: number): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    await LocalNotifications.cancel({ notifications: [{ id }] });
+  } catch (e) {
+    console.warn('Failed to cancel native notification:', e);
+  }
+}
+
+/** Cancel all pending native notifications (e.g. on end shift). */
+export async function cancelAllNativeAlerts(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    const pending = await LocalNotifications.getPending();
+    if (pending.notifications.length > 0) {
+      await LocalNotifications.cancel({ notifications: pending.notifications });
+    }
+  } catch (e) {
+    console.warn('Failed to cancel all native notifications:', e);
+  }
+}
+
 export async function showBrowserNotification(title: string, body: string, type: 'alarm' | 'reminder' = 'alarm'): Promise<void> {
   if (Capacitor.isNativePlatform()) {
     const perm = await LocalNotifications.checkPermissions();

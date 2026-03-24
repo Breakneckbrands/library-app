@@ -5,6 +5,9 @@ import { toast } from 'sonner';
 import {
   fireAllNotifications,
   requestNotificationPermission,
+  scheduleNativeAlert,
+  cancelNativeAlert,
+  cancelAllNativeAlerts,
   initAudioContext,
   DEFAULT_PREFS
 } from '@/utils/notifications';
@@ -18,6 +21,7 @@ interface ScheduledAlert {
   label: string;
   scheduledTime: Date;
   fired: boolean;
+  nativeId?: number; // native iOS notification ID for cancellation
 }
 
 interface ShiftData {
@@ -241,6 +245,7 @@ export function ShiftTracker() {
 
   const endShift = useCallback(() => {
     if (!window.confirm('End this shift? All data will be cleared.')) return;
+    cancelAllNativeAlerts(); // clear any pre-scheduled lock screen notifications
     setShiftStarted(false);
     setStartTime(null);
     setElapsedTime('00:00');
@@ -303,19 +308,32 @@ export function ShiftTracker() {
     setShowTimerModal(true);
   }, []);
 
-  const submitTimer = useCallback(() => {
+  const submitTimer = useCallback(async () => {
     if (!timerLabel.trim()) { toast.error('Enter a timer name'); return; }
     const secs = timerType === 'countdown' ? cdMinutes * 60 + cdSeconds : undefined;
     if (timerType === 'countdown' && (!secs || secs <= 0)) { toast.error('Set a duration > 0'); return; }
+    const startTime = new Date();
+    let nativeId: number | undefined;
+    if (timerType === 'countdown' && secs && notificationPermission === 'granted') {
+      nativeId = Math.floor(Math.random() * 2000000000);
+      const firesAt = new Date(startTime.getTime() + secs * 1000);
+      await scheduleNativeAlert(nativeId, `⏰ Timer Done`, timerLabel.trim(), firesAt);
+    }
     setCustomTimers(prev => [...prev, {
       id: Date.now().toString(), label: timerLabel.trim(),
-      startTime: new Date(), type: timerType, targetSeconds: secs, alarmFired: false,
+      startTime, type: timerType, targetSeconds: secs, alarmFired: false, nativeId,
     }]);
     setShowTimerModal(false);
     toast.success(`Timer "${timerLabel.trim()}" started`);
-  }, [timerLabel, timerType, cdMinutes, cdSeconds]);
+  }, [timerLabel, timerType, cdMinutes, cdSeconds, notificationPermission]);
 
-  const removeTimer = useCallback((id: string) => setCustomTimers(t => t.filter(x => x.id !== id)), []);
+  const removeTimer = useCallback((id: string) => {
+    setCustomTimers(prev => {
+      const timer = prev.find(t => t.id === id);
+      if (timer?.nativeId) cancelNativeAlert(timer.nativeId);
+      return prev.filter(t => t.id !== id);
+    });
+  }, []);
 
   const handleAlarmFire = useCallback((id: string, label: string) => {
     setCustomTimers(prev => prev.map(t => t.id === id ? { ...t, alarmFired: true } : t));
@@ -342,18 +360,31 @@ export function ShiftTracker() {
     if (!alertDateTime) { toast.error('Set an alert time'); return; }
     const scheduledTime = new Date(alertDateTime);
     if (scheduledTime <= new Date()) { toast.error('Alert time must be in the future'); return; }
-    if (notificationPermission !== 'granted') {
-      const p = await requestNotificationPermission();
-      setNotificationPermission(p);
+    let perm = notificationPermission;
+    if (perm !== 'granted') {
+      perm = await requestNotificationPermission();
+      setNotificationPermission(perm);
+    }
+    // Use a numeric ID for native notification (iOS requires int)
+    const nativeId = Math.floor(Math.random() * 2000000000);
+    // Pre-schedule with iOS so it fires even when app is backgrounded/locked
+    if (perm === 'granted') {
+      await scheduleNativeAlert(nativeId, `⏰ ${alertLabel.trim()}`, 'Scheduled alert', scheduledTime);
     }
     setScheduledAlerts(prev => [...prev, {
-      id: Date.now().toString(), label: alertLabel.trim(), scheduledTime, fired: false,
+      id: Date.now().toString(), label: alertLabel.trim(), scheduledTime, fired: false, nativeId,
     }]);
     setShowAlertModal(false);
     toast.success(`Alert set for ${scheduledTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
   }, [alertLabel, alertDateTime, notificationPermission]);
 
-  const removeAlert = useCallback((id: string) => setScheduledAlerts(a => a.filter(x => x.id !== id)), []);
+  const removeAlert = useCallback((id: string) => {
+    setScheduledAlerts(prev => {
+      const alert = prev.find(a => a.id === id);
+      if (alert?.nativeId) cancelNativeAlert(alert.nativeId);
+      return prev.filter(a => a.id !== id);
+    });
+  }, []);
 
   // Computed
   const { completedDocs, totalDocs } = rooms.reduce(

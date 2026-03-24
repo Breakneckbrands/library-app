@@ -8,6 +8,7 @@ export interface CustomTimer {
   type: 'countup' | 'countdown';
   targetSeconds?: number;
   alarmFired?: boolean;
+  nativeId?: number;
 }
 
 interface TimerDisplayProps {
