@@ -83,10 +83,14 @@ export async function showBrowserNotification(title: string, body: string, type:
             {
               title,
               body,
-              id: Date.now() % 100000,
-              schedule: { at: new Date(Date.now() + 100) },
-              // Let iOS use default notification sound for all types
+              id: Math.floor(Math.random() * 2147483647),
+              // 1 second delay gives iOS time to process and ensures Watch mirrors it
+              schedule: { at: new Date(Date.now() + 1000) },
               sound: 'default',
+              // Group notifications by thread so Watch shows them together
+              threadIdentifier: 'shift-tracker-alerts',
+              // Summaryable grouping for notification center
+              summaryArgument: 'Shift Tracker',
             }
           ]
         });

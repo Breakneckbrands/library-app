@@ -1,0 +1,35 @@
+diff --git a/node_modules/@capacitor/local-notifications/ios/Sources/LocalNotificationsPlugin/LocalNotificationsHandler.swift b/node_modules/@capacitor/local-notifications/ios/Sources/LocalNotificationsPlugin/LocalNotificationsHandler.swift
+index e0bf257..3036203 100644
+--- a/node_modules/@capacitor/local-notifications/ios/Sources/LocalNotificationsPlugin/LocalNotificationsHandler.swift
++++ b/node_modules/@capacitor/local-notifications/ios/Sources/LocalNotificationsPlugin/LocalNotificationsHandler.swift
+@@ -11,7 +11,12 @@ public class LocalNotificationsHandler: NSObject, NotificationHandlerProtocol {
+ 
+     public func requestPermissions(with completion: ((Bool, Error?) -> Void)? = nil) {
+         let center = UNUserNotificationCenter.current()
+-        center.requestAuthorization(options: [.badge, .alert, .sound]) { (granted, error) in
++        // Request timeSensitive so alerts break through Focus modes and mirror to Apple Watch
++        var options: UNAuthorizationOptions = [.badge, .alert, .sound]
++        if #available(iOS 15.0, *) {
++            options.insert(.timeSensitive)
++        }
++        center.requestAuthorization(options: options) { (granted, error) in
+             completion?(granted, error)
+         }
+     }
+@@ -35,11 +40,11 @@ public class LocalNotificationsHandler: NSObject, NotificationHandlerProtocol {
+             }
+         }
+ 
+-        return [
+-            .badge,
+-            .sound,
+-            .alert
+-        ]
++        // iOS 14+: use .banner (appears at top + mirrors to Apple Watch) + .list (stays in Notification Center)
++        if #available(iOS 14.0, *) {
++            return [.badge, .sound, .banner, .list]
++        }
++        return [.badge, .sound, .alert]
+     }
+ 
+     public func didReceive(response: UNNotificationResponse) {

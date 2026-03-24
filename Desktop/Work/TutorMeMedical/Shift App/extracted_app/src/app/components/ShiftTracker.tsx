@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Clock, Plus, X, Timer, ChevronDown, AlarmClock, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -88,6 +89,17 @@ export function ShiftTracker() {
     localStorage.setItem('appSettings', JSON.stringify(settings));
   }, [settings]);
 
+  // Request native notification permission on startup (iOS requires an explicit prompt)
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      requestNotificationPermission().then(perm => {
+        setNotificationPermission(perm);
+      });
+    } else if ('Notification' in window && Notification.permission !== 'default') {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
+
   const HOURLY_SLOTS = generateHourlySlots(settings.shiftStartHour);
   const freshDocs = useCallback(() => JSON.parse(JSON.stringify(settings.defaultDocs)) as DocumentationItem[], [settings.defaultDocs]);
 
@@ -139,7 +151,6 @@ export function ShiftTracker() {
         }
       } catch { /* ignore */ }
     }
-    if ('Notification' in window) setNotificationPermission(Notification.permission);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

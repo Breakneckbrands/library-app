@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "dev": "vite"
+    "dev": "vite",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@capacitor/core": "^7.6.0",
@@ -74,6 +75,7 @@
     "@capacitor/cli": "^7.6.0",
     "@tailwindcss/vite": "4.1.12",
     "@vitejs/plugin-react": "4.7.0",
+    "patch-package": "^8.0.1",
     "tailwindcss": "4.1.12",
     "vite": "6.3.5"
   },
