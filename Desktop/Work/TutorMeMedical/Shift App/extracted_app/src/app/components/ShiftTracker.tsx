@@ -291,15 +291,28 @@ export function ShiftTracker() {
   const toggleDoc = useCallback((roomId: string, docId: string, parentId?: string) => {
     setRooms(rooms => rooms.map(room => {
       if (room.id !== roomId) return room;
-      return {
-        ...room,
-        documentation: room.documentation.map(doc => {
-          if (parentId && doc.id === parentId && doc.subItems)
-            return { ...doc, subItems: doc.subItems.map(s => s.id === docId ? { ...s, completed: !s.completed } : s) };
-          if (doc.id === docId) return { ...doc, completed: !doc.completed };
-          return doc;
-        }),
-      };
+      let newCompletedSlots = { ...room.completedSlots };
+
+      const newDocs = room.documentation.map(doc => {
+        if (parentId && doc.id === parentId && doc.subItems) {
+          const newSubItems = doc.subItems.map(s => {
+            if (s.id !== docId) return s;
+            const newCompleted = !s.completed;
+            if (s.hourKey) newCompletedSlots[s.hourKey] = newCompleted;
+            return { ...s, completed: newCompleted };
+          });
+          return { ...doc, subItems: newSubItems };
+        }
+        if (doc.id === docId) {
+          const newCompleted = !doc.completed;
+          // Bidirectional sync: mirror completion state to the linked hourly slot
+          if (doc.hourKey) newCompletedSlots[doc.hourKey] = newCompleted;
+          return { ...doc, completed: newCompleted };
+        }
+        return doc;
+      });
+
+      return { ...room, documentation: newDocs, completedSlots: newCompletedSlots };
     }));
   }, []);
 
@@ -363,7 +376,20 @@ export function ShiftTracker() {
       if (r.id !== roomId) return r;
       const nowComplete = !r.completedSlots[key];
       if (nowComplete) cancelSlotNotif(roomId, key);
-      return { ...r, completedSlots: { ...r.completedSlots, [key]: nowComplete } };
+
+      // Bidirectional sync: mirror completion state to any doc items linked to this slot
+      const updatedDocs = r.documentation.map(doc => {
+        if (doc.hourKey === key) return { ...doc, completed: nowComplete };
+        if (doc.subItems) {
+          return {
+            ...doc,
+            subItems: doc.subItems.map(s => s.hourKey === key ? { ...s, completed: nowComplete } : s),
+          };
+        }
+        return doc;
+      });
+
+      return { ...r, completedSlots: { ...r.completedSlots, [key]: nowComplete }, documentation: updatedDocs };
     }));
   }, [cancelSlotNotif]);
 

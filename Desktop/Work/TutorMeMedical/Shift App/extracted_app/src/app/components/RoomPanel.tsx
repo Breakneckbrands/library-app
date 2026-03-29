@@ -7,6 +7,8 @@ export interface DocumentationItem {
   label: string;
   completed: boolean;
   subItems?: DocumentationItem[];
+  /** Hourly slot key (e.g. "2P") — set when task is added with a time; used for bidirectional sync */
+  hourKey?: string;
 }
 
 export interface ShiftNote {
@@ -166,9 +168,26 @@ export function RoomPanel({
     if (!quickAddText.trim()) return;
     const label = quickAddText.trim();
     const timeStr = quickAddTime;
+
+    // Compute the hourly slot key from the time, for bidirectional sync
+    let taskHourKey: string | undefined;
+    if (timeStr) {
+      const h24 = parseInt(timeStr.split(':')[0]);
+      const slot = hourlySlots.find(s => {
+        const isPM = s.key.endsWith('P');
+        const h12 = parseInt(s.key);
+        const slotH24 = isPM ? (h12 === 12 ? 12 : h12 + 12) : (h12 === 12 ? 0 : h12);
+        return slotH24 === h24;
+      });
+      taskHourKey = slot?.key;
+    }
+
     onUpdateRoom(room.id, {
       documentation: [...room.documentation, {
-        id: `custom-${Date.now()}`, label: timeStr ? `${label} @ ${timeStr}` : label, completed: false,
+        id: `custom-${Date.now()}`,
+        label: timeStr ? `${label} @ ${timeStr}` : label,
+        completed: false,
+        hourKey: taskHourKey,
       }],
     });
     // If a time was set, also log it as a timestamped note in the right hourly slot
