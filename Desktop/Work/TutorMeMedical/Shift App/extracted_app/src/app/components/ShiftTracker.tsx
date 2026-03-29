@@ -707,9 +707,9 @@ export function ShiftTracker() {
         </div>
       )}
 
-      {/* Header — safe-area-inset-top keeps it below iOS status bar */}
+      {/* Header — safe-area-inset-top + extra breathing room below iOS status bar */}
       <div className="bg-white border-b border-gray-200 px-3 sticky top-0 z-10 shadow-sm"
-        style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
+        style={{ paddingTop: 'calc(max(12px, env(safe-area-inset-top)) + 20px)' }}>
         <div className="pb-2 space-y-2">
 
           {/* Top row: logo + actions */}
@@ -720,7 +720,7 @@ export function ShiftTracker() {
                 <Clock className="w-4 h-4 text-indigo-600 hidden" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-sm font-bold text-gray-800 leading-tight truncate">Medical Shift Tracker</h1>
+                <h1 className="text-sm font-bold font-heading text-gray-800 leading-tight truncate">Medical Shift Tracker</h1>
                 {shiftStarted && startTime && (
                   <p className="text-[11px] text-gray-400">
                     Started {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

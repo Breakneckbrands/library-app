@@ -250,7 +250,7 @@ export function RoomPanel({
                 {/* Room badge */}
                 <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-white border border-gray-200 shadow-sm flex flex-col items-center justify-center">
                   <span className="text-[9px] font-bold text-gray-400 uppercase leading-none">Rm</span>
-                  <span className="text-base font-black text-gray-800 leading-tight">
+                  <span className="text-base font-black font-accent text-gray-800 leading-tight">
                     {room.roomNumber || '—'}
                   </span>
                 </div>

@@ -72,7 +72,7 @@ export function TimerDisplay({ timer, onRemove, onAlarmFire }: TimerDisplayProps
         <p className="text-xs text-gray-600">
           {timer.label} {timer.type === 'countdown' ? '⏳' : '▶'}
         </p>
-        <p className={`text-lg font-bold ${textColor} ${done ? 'animate-pulse' : ''}`}>{display}</p>
+        <p className={`text-lg font-bold font-accent ${textColor} ${done ? 'animate-pulse' : ''}`}>{display}</p>
       </div>
       <button
         onClick={() => onRemove(timer.id)}

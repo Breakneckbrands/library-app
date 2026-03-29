@@ -1,6 +1,28 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* ── Brand style guide ──────────────────────────────────────────── */
+  --color-bg-base: hsl(215, 10%, 99%);
+  --color-bg-card: hsl(215, 0%, 100%);
+  --color-border: hsl(215, 15%, 85%);
+  --color-primary: hsl(215, 100%, 47.1%);
+  --color-primary-hover: hsl(215, 100%, 37.1%);
+  --color-accent-comp: hsl(35, 100%, 47.1%);
+  --color-text-heading: hsl(215, 10%, 11%);
+  --color-text-body: hsl(215, 10%, 20%);
+  --color-text-sub: hsl(215, 10%, 40%);
+
+  /* Typography hierarchy */
+  --font-heading: 'Roboto Condensed', sans-serif;
+  --font-body: 'Raleway', sans-serif;
+  --font-accent: 'Oswald', sans-serif;
+
+  /* Semantic text colors (aliases) */
+  --text-heading: var(--color-text-heading);
+  --text-body: var(--color-text-body);
+  --text-muted: var(--color-text-sub);
+  /* ───────────────────────────────────────────────────────────────── */
+
   --font-size: 16px;
   --background: #ffffff;
   --foreground: oklch(0.145 0 0);
@@ -132,6 +154,13 @@ input, textarea, select {
 
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    color: var(--color-text-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    color: var(--color-text-heading);
   }
 
   /**

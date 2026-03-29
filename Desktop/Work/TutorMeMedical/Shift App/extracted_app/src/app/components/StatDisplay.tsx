@@ -8,7 +8,7 @@ export function Stat({ label, value, color }: { label: string; value: string; co
   return (
     <div className={`${bg} border px-2.5 py-1.5 rounded-lg flex-shrink-0`}>
       <p className="text-[10px] text-gray-500 leading-tight">{label}</p>
-      <p className={`text-base font-bold ${text} leading-tight`}>{value}</p>
+      <p className={`text-base font-bold font-accent ${text} leading-tight`}>{value}</p>
     </div>
   );
 }
