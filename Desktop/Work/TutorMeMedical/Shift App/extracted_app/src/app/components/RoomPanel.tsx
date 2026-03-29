@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Plus, ChevronDown, CheckCircle2, Circle, Trash2, FileText, Clock } from 'lucide-react';
+import { Plus, ChevronDown, CheckCircle2, Circle, Trash2, FileText, Clock, StickyNote } from 'lucide-react';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from './ui/collapsible';
 
 export interface DocumentationItem {
@@ -36,7 +36,7 @@ interface RoomPanelProps {
   onUpdateHourlyData: (roomId: string, key: string, value: string) => void;
   onToggleSlotComplete: (roomId: string, key: string) => void;
   onRemoveRoom: (id: string) => void;
-  onAddNote: (roomId: string, text: string) => void;
+  onAddNote: (roomId: string, text: string, timeOverride?: string) => void;
 }
 
 // Convert slot key like "1P", "6A", "12P" → 24h hour
@@ -104,8 +104,17 @@ export function RoomPanel({
   onAddNote,
 }: RoomPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  // Collapsed quick-add task (with optional time)
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddText, setQuickAddText] = useState('');
+  const [quickAddTime, setQuickAddTime] = useState('');
+
+  // Collapsed quick-note
+  const [showQuickNote, setShowQuickNote] = useState(false);
+  const [quickNoteText, setQuickNoteText] = useState('');
+
+  // Expanded note input
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [noteText, setNoteText] = useState('');
 
@@ -127,6 +136,11 @@ export function RoomPanel({
     }
   };
 
+  const nowTimeStr = () => {
+    const n = new Date();
+    return `${String(n.getHours()).padStart(2, '0')}:${String(n.getMinutes()).padStart(2, '0')}`;
+  };
+
   const completedSlots = room.completedSlots ?? {};
   const notes = room.notes ?? [];
 
@@ -142,12 +156,24 @@ export function RoomPanel({
 
   const handleQuickAddSubmit = () => {
     if (!quickAddText.trim()) return;
+    const label = quickAddText.trim();
+    const timeStr = quickAddTime;
     onUpdateRoom(room.id, {
       documentation: [...room.documentation, {
-        id: `custom-${Date.now()}`, label: quickAddText.trim(), completed: false,
+        id: `custom-${Date.now()}`, label: timeStr ? `${label} @ ${timeStr}` : label, completed: false,
       }],
     });
-    setQuickAddText(''); setShowQuickAdd(false);
+    // If a time was set, also log it as a timestamped note in the right hourly slot
+    if (timeStr) {
+      onAddNote(room.id, `[Task added] ${label}`, timeStr);
+    }
+    setQuickAddText(''); setQuickAddTime(''); setShowQuickAdd(false);
+  };
+
+  const handleQuickNoteSubmit = () => {
+    if (!quickNoteText.trim()) return;
+    onAddNote(room.id, quickNoteText.trim());
+    setQuickNoteText(''); setShowQuickNote(false);
   };
 
   const handleNoteSubmit = () => {
@@ -239,8 +265,17 @@ export function RoomPanel({
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 flex-shrink-0">
+                  {/* Quick note */}
                   <button
-                    onClick={e => { e.stopPropagation(); setShowQuickAdd(p => !p); }}
+                    onClick={e => { e.stopPropagation(); setShowQuickNote(p => !p); setShowQuickAdd(false); }}
+                    className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-teal-600 hover:border-teal-300 flex items-center justify-center transition-colors"
+                    title="Add timestamped note"
+                  >
+                    <StickyNote className="w-4 h-4" />
+                  </button>
+                  {/* Quick add task */}
+                  <button
+                    onClick={e => { e.stopPropagation(); setShowQuickAdd(p => !p); setShowQuickNote(false); }}
                     className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-400 hover:text-indigo-600 hover:border-indigo-300 flex items-center justify-center transition-colors"
                     title="Quick add task"
                   >
@@ -251,18 +286,48 @@ export function RoomPanel({
               </div>
             </CollapsibleTrigger>
 
-            {/* ── Quick Add ──────────────────────────────────────────── */}
+            {/* ── Quick Note (collapsed) ─────────────────────────────── */}
+            {showQuickNote && (
+              <div className="px-3 pb-3 pt-2 border-t border-teal-100 bg-teal-50" onClick={e => e.stopPropagation()}>
+                <p className="text-[10px] font-bold text-teal-600 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> Note — auto-stamped to current time & slot
+                </p>
+                <div className="flex items-center gap-2">
+                  <input autoFocus type="text" value={quickNoteText}
+                    onChange={e => setQuickNoteText(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleQuickNoteSubmit(); if (e.key === 'Escape') setShowQuickNote(false); }}
+                    placeholder="e.g. pt pulled out IV, MD notified..."
+                    className="flex-1 border border-teal-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  />
+                  <button onClick={handleQuickNoteSubmit} className="px-3 py-2 bg-teal-500 text-white text-sm font-semibold rounded-lg hover:bg-teal-600">Save</button>
+                  <button onClick={() => { setShowQuickNote(false); setQuickNoteText(''); }} className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-200 rounded-lg">✕</button>
+                </div>
+              </div>
+            )}
+
+            {/* ── Quick Add Task (collapsed) ─────────────────────────── */}
             {showQuickAdd && (
               <div className="px-3 pb-3 pt-2 border-t border-gray-100 bg-gray-50" onClick={e => e.stopPropagation()}>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                  <Clock className="w-3 h-3" /> Add Task — optional time links it to the timeline
+                </p>
                 <div className="flex items-center gap-2">
                   <input autoFocus type="text" value={quickAddText}
                     onChange={e => setQuickAddText(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleQuickAddSubmit(); if (e.key === 'Escape') setShowQuickAdd(false); }}
-                    placeholder="New task name..."
+                    placeholder="Task name..."
                     className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   />
+                  <input
+                    type="time"
+                    value={quickAddTime}
+                    onChange={e => setQuickAddTime(e.target.value)}
+                    onClick={e => { if (!quickAddTime) setQuickAddTime(nowTimeStr()); e.stopPropagation(); }}
+                    placeholder="Time"
+                    className="border border-gray-300 rounded-lg px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 w-28 text-gray-600"
+                  />
                   <button onClick={handleQuickAddSubmit} className="px-3 py-2 bg-indigo-500 text-white text-sm font-semibold rounded-lg hover:bg-indigo-600">Add</button>
-                  <button onClick={() => { setShowQuickAdd(false); setQuickAddText(''); }} className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-200 rounded-lg">✕</button>
+                  <button onClick={() => { setShowQuickAdd(false); setQuickAddText(''); setQuickAddTime(''); }} className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-200 rounded-lg">✕</button>
                 </div>
               </div>
             )}

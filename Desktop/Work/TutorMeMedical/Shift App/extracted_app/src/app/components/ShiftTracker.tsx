@@ -366,20 +366,26 @@ export function ShiftTracker() {
     }));
   }, [cancelSlotNotif]);
 
-  const addNote = useCallback((roomId: string, text: string) => {
+  const addNote = useCallback((roomId: string, text: string, timeOverride?: string) => {
     const now = new Date();
-    const currentH24 = now.getHours();
+    // If a HH:MM override is provided, use that hour for slot bucketing
+    const h24 = timeOverride
+      ? parseInt(timeOverride.split(':')[0])
+      : now.getHours();
+    const enteredAt = timeOverride
+      ? (() => { const d = new Date(now); d.setHours(parseInt(timeOverride.split(':')[0]), parseInt(timeOverride.split(':')[1]), 0, 0); return d.toISOString(); })()
+      : now.toISOString();
     const slot = HOURLY_SLOTS.find(s => {
       const isPM = s.key.endsWith('P');
       const h12 = parseInt(s.key);
-      const h24 = isPM ? (h12 === 12 ? 12 : h12 + 12) : (h12 === 12 ? 0 : h12);
-      return h24 === currentH24;
+      const slotH24 = isPM ? (h12 === 12 ? 12 : h12 + 12) : (h12 === 12 ? 0 : h12);
+      return slotH24 === h24;
     });
     const note: ShiftNote = {
       id: Date.now().toString(),
       text,
-      enteredAt: now.toISOString(),
-      hourKey: slot?.key ?? `${currentH24}`,
+      enteredAt,
+      hourKey: slot?.key ?? `${h24}`,
     };
     setRooms(rooms => rooms.map(r => r.id === roomId ? { ...r, notes: [...(r.notes || []), note] } : r));
   }, [HOURLY_SLOTS]);
