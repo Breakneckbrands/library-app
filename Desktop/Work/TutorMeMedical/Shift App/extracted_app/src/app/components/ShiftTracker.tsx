@@ -11,7 +11,7 @@ import {
   initAudioContext,
   DEFAULT_PREFS
 } from '@/utils/notifications';
-import { RoomPanel, type DocumentationItem, type RoomData } from './RoomPanel';
+import { RoomPanel, type DocumentationItem, type RoomData, type ShiftNote } from './RoomPanel';
 import { Stat } from './StatDisplay';
 import { TimerDisplay, type CustomTimer } from './TimerDisplay';
 import { SettingsModal, type AppSettings } from './SettingsModal';
@@ -64,6 +64,28 @@ function generateHourlySlots(startHour: number) {
   return slots;
 }
 
+// Deterministic native notification ID for a room's hourly slot
+function slotNotifId(roomId: string, slotKey: string): number {
+  let h = 0;
+  const s = roomId + '|' + slotKey;
+  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
+  return (Math.abs(h) % 2000000000) + 1;
+}
+
+// Convert slot key ("1P", "6A", "12P") to a Date object for today/tomorrow
+function slotKeyToDate(key: string, shiftStartHour: number): Date {
+  const isPM = key.endsWith('P');
+  const h12 = parseInt(key);
+  const h24 = isPM ? (h12 === 12 ? 12 : h12 + 12) : (h12 === 12 ? 0 : h12);
+  const d = new Date();
+  d.setHours(h24, 0, 0, 0);
+  // Night shift: slots crossing midnight are scheduled for next calendar day
+  if (shiftStartHour >= 18 && h24 < 12 && new Date().getHours() >= shiftStartHour) {
+    d.setDate(d.getDate() + 1);
+  }
+  return d;
+}
+
 function toDatetimeLocal(d: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
@@ -76,6 +98,8 @@ export function ShiftTracker() {
     shiftStartHour: 6,
     defaultDocs: INITIAL_DOCS,
     hourlyReminder: false,
+    hourlySlot30MinReminder: false,
+    lunchBreakMinutes: 30,
   });
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
@@ -117,6 +141,8 @@ export function ShiftTracker() {
   // Rooms
   const [rooms, setRooms] = useState<RoomData[]>([]);
 
+  const [lunchNativeId] = useState<number>(999999998); // fixed deterministic ID for lunch alarm
+
   // Timers & Alerts
   const [showTimersMenu, setShowTimersMenu] = useState(false);
   const [customTimers, setCustomTimers] = useState<CustomTimer[]>([]);
@@ -131,6 +157,7 @@ export function ShiftTracker() {
   const [cdMinutes, setCdMinutes] = useState(5);
   const [cdSeconds, setCdSeconds] = useState(0);
 
+  const [showUnnamedConfirm, setShowUnnamedConfirm] = useState(false);
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [alertLabel, setAlertLabel] = useState('');
   const [alertDateTime, setAlertDateTime] = useState('');
@@ -148,7 +175,7 @@ export function ShiftTracker() {
         if (data.startTime) {
           setShiftStarted(true);
           setStartTime(new Date(data.startTime));
-          setRooms((data.rooms || []).map(r => ({ ...r, documentation: r.documentation || freshDocs() })));
+          setRooms((data.rooms || []).map(r => ({ ...r, documentation: r.documentation || freshDocs(), notes: r.notes || [] })));
           setCustomTimers((data.customTimers || []).map(t => ({ ...t, startTime: new Date(t.startTime) })));
           if (data.lunchStartTime) setLunchStartTime(new Date(data.lunchStartTime));
           setScheduledAlerts((data.scheduledAlerts || []).map(a => ({ ...a, scheduledTime: new Date(a.scheduledTime) })));
@@ -184,12 +211,14 @@ export function ShiftTracker() {
   useEffect(() => {
     if (!lunchStartTime) return;
     const id = setInterval(() => {
-      const d = Date.now() - lunchStartTime.getTime();
-      const m = Math.floor(d / 60000), s = Math.floor((d % 60000) / 1000);
-      setLunchElapsed(`${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+      const breakMs = (settings.lunchBreakMinutes ?? 30) * 60 * 1000;
+      const remaining = Math.max(0, breakMs - (Date.now() - lunchStartTime.getTime()));
+      const m = Math.floor(remaining / 60000);
+      const s = Math.floor((remaining % 60000) / 1000);
+      setLunchElapsed(`${m}:${String(s).padStart(2, '0')}`);
     }, 1000);
     return () => clearInterval(id);
-  }, [lunchStartTime]);
+  }, [lunchStartTime, settings.lunchBreakMinutes]);
 
   // Hourly reminder
   useEffect(() => {
@@ -284,6 +313,7 @@ export function ShiftTracker() {
       roomNumber: newRoomNumber.trim(),
       hourlyData: {}, completedSlots: {}, intake: '', output: '',
       documentation: freshDocs(),
+      notes: [],
     }]);
     setShowAddRoomModal(false);
   }, [newRoomNumber, freshDocs]);
@@ -295,8 +325,64 @@ export function ShiftTracker() {
   const updateRoom = useCallback((id: string, updates: Partial<RoomData>) =>
     setRooms(rooms => rooms.map(r => r.id === id ? { ...r, ...updates } : r)), []);
 
-  const updateHourlyData = useCallback((roomId: string, key: string, value: string) =>
-    setRooms(rooms => rooms.map(r => r.id === roomId ? { ...r, hourlyData: { ...r.hourlyData, [key]: value } } : r)), []);
+  // Schedule / cancel native notification for a filled hourly slot
+  const scheduleSlotNotif = useCallback(async (roomId: string, slotKey: string, roomNumber: string) => {
+    if (notificationPermission !== 'granted') return;
+    const slotDate = slotKeyToDate(slotKey, settings.shiftStartHour);
+    if (slotDate <= new Date()) return; // Already past
+    const id = slotNotifId(roomId, slotKey);
+    await scheduleNativeAlert(id, '⏰ Hourly Check Due', `Room ${roomNumber || roomId} — check ${slotKey} observation`, slotDate);
+    if (settings.hourlySlot30MinReminder) {
+      const earlyDate = new Date(slotDate.getTime() - 30 * 60 * 1000);
+      if (earlyDate > new Date()) {
+        await scheduleNativeAlert(slotNotifId(roomId, slotKey + '_30'), '⏰ Upcoming Hourly', `Room ${roomNumber || roomId} — 30 min until ${slotKey}`, earlyDate);
+      }
+    }
+  }, [notificationPermission, settings.shiftStartHour, settings.hourlySlot30MinReminder]);
+
+  const cancelSlotNotif = useCallback(async (roomId: string, slotKey: string) => {
+    await cancelNativeAlert(slotNotifId(roomId, slotKey));
+    await cancelNativeAlert(slotNotifId(roomId, slotKey + '_30'));
+  }, []);
+
+  const updateHourlyData = useCallback(async (roomId: string, key: string, value: string) => {
+    setRooms(rooms => {
+      const room = rooms.find(r => r.id === roomId);
+      if (value.trim()) {
+        scheduleSlotNotif(roomId, key, room?.roomNumber ?? '');
+      } else {
+        cancelSlotNotif(roomId, key);
+      }
+      return rooms.map(r => r.id === roomId ? { ...r, hourlyData: { ...r.hourlyData, [key]: value } } : r);
+    });
+  }, [scheduleSlotNotif, cancelSlotNotif]);
+
+  const toggleSlotComplete = useCallback((roomId: string, key: string) => {
+    setRooms(rooms => rooms.map(r => {
+      if (r.id !== roomId) return r;
+      const nowComplete = !r.completedSlots[key];
+      if (nowComplete) cancelSlotNotif(roomId, key);
+      return { ...r, completedSlots: { ...r.completedSlots, [key]: nowComplete } };
+    }));
+  }, [cancelSlotNotif]);
+
+  const addNote = useCallback((roomId: string, text: string) => {
+    const now = new Date();
+    const currentH24 = now.getHours();
+    const slot = HOURLY_SLOTS.find(s => {
+      const isPM = s.key.endsWith('P');
+      const h12 = parseInt(s.key);
+      const h24 = isPM ? (h12 === 12 ? 12 : h12 + 12) : (h12 === 12 ? 0 : h12);
+      return h24 === currentH24;
+    });
+    const note: ShiftNote = {
+      id: Date.now().toString(),
+      text,
+      enteredAt: now.toISOString(),
+      hourKey: slot?.key ?? `${currentH24}`,
+    };
+    setRooms(rooms => rooms.map(r => r.id === roomId ? { ...r, notes: [...(r.notes || []), note] } : r));
+  }, [HOURLY_SLOTS]);
 
   const openTimerModal = useCallback(() => {
     initAudioContext();
@@ -304,12 +390,15 @@ export function ShiftTracker() {
     setTimerType('countup');
     setCdMinutes(5);
     setCdSeconds(0);
+    setShowUnnamedConfirm(false);
     setShowTimersMenu(false);
     setShowTimerModal(true);
   }, []);
 
-  const submitTimer = useCallback(async () => {
-    if (!timerLabel.trim()) { toast.error('Enter a timer name'); return; }
+  const submitTimer = useCallback(async (forceName?: string) => {
+    const resolvedLabel = forceName ?? (timerLabel.trim() || '');
+    if (!resolvedLabel && !showUnnamedConfirm) { setShowUnnamedConfirm(true); return; }
+    const finalLabel = resolvedLabel || 'Unnamed Timer';
     const secs = timerType === 'countdown' ? cdMinutes * 60 + cdSeconds : undefined;
     if (timerType === 'countdown' && (!secs || secs <= 0)) { toast.error('Set a duration > 0'); return; }
     const startTime = new Date();
@@ -317,15 +406,16 @@ export function ShiftTracker() {
     if (timerType === 'countdown' && secs && notificationPermission === 'granted') {
       nativeId = Math.floor(Math.random() * 2000000000);
       const firesAt = new Date(startTime.getTime() + secs * 1000);
-      await scheduleNativeAlert(nativeId, `⏰ Timer Done`, timerLabel.trim(), firesAt);
+      await scheduleNativeAlert(nativeId, `⏰ Timer Done`, finalLabel, firesAt);
     }
     setCustomTimers(prev => [...prev, {
-      id: Date.now().toString(), label: timerLabel.trim(),
+      id: Date.now().toString(), label: finalLabel,
       startTime, type: timerType, targetSeconds: secs, alarmFired: false, nativeId,
     }]);
+    setShowUnnamedConfirm(false);
     setShowTimerModal(false);
-    toast.success(`Timer "${timerLabel.trim()}" started`);
-  }, [timerLabel, timerType, cdMinutes, cdSeconds, notificationPermission]);
+    toast.success(`Timer "${finalLabel}" started`);
+  }, [timerLabel, timerType, cdMinutes, cdSeconds, notificationPermission, showUnnamedConfirm]);
 
   const removeTimer = useCallback((id: string) => {
     setCustomTimers(prev => {
@@ -343,10 +433,23 @@ export function ShiftTracker() {
     }
   }, [settings.notifications]);
 
-  const clockOutForLunch = useCallback(() => {
-    if (lunchStartTime) { setLunchStartTime(null); toast.success('Clocked back in'); }
-    else { setLunchStartTime(new Date()); setShowTimersMenu(false); toast.success('Clocked out for lunch'); }
-  }, [lunchStartTime]);
+  const clockOutForLunch = useCallback(async () => {
+    if (lunchStartTime) {
+      // Clock back in: cancel the lunch alarm
+      await cancelNativeAlert(lunchNativeId);
+      setLunchStartTime(null);
+      toast.success('Clocked back in');
+    } else {
+      const mins = settings.lunchBreakMinutes ?? 30;
+      const alarmAt = new Date(Date.now() + mins * 60 * 1000);
+      if (notificationPermission === 'granted') {
+        await scheduleNativeAlert(lunchNativeId, '🍽 Lunch Break Over', `Your ${mins}-minute lunch break has ended`, alarmAt);
+      }
+      setLunchStartTime(new Date());
+      setShowTimersMenu(false);
+      toast.success(`Clocked out for lunch — ${mins} min alarm set`);
+    }
+  }, [lunchStartTime, lunchNativeId, settings.lunchBreakMinutes, notificationPermission]);
 
   const openAlertModal = useCallback(() => {
     setAlertLabel('');
@@ -456,14 +559,27 @@ export function ShiftTracker() {
                 </div>
               </div>
             )}
-            <div className="flex gap-3 pt-1">
-              <button onClick={() => setShowTimerModal(false)}
-                className="flex-1 border border-gray-300 text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
-              <button onClick={submitTimer}
-                className={`flex-1 text-white py-2 rounded-lg text-sm font-semibold ${timerType === 'countdown' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-purple-500 hover:bg-purple-600'}`}>
-                Start Timer
-              </button>
-            </div>
+            {showUnnamedConfirm && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+                No name entered. Continue as <strong>"Unnamed Timer"</strong>?
+                <div className="flex gap-2 mt-2">
+                  <button onClick={() => submitTimer('Unnamed Timer')}
+                    className="flex-1 bg-yellow-500 text-white py-1.5 rounded-lg text-sm font-semibold hover:bg-yellow-600">Yes, continue</button>
+                  <button onClick={() => setShowUnnamedConfirm(false)}
+                    className="flex-1 border border-gray-300 text-gray-600 py-1.5 rounded-lg text-sm hover:bg-gray-50">Add a name</button>
+                </div>
+              </div>
+            )}
+            {!showUnnamedConfirm && (
+              <div className="flex gap-3 pt-1">
+                <button onClick={() => { setShowTimerModal(false); setShowUnnamedConfirm(false); }}
+                  className="flex-1 border border-gray-300 text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+                <button onClick={() => submitTimer()}
+                  className={`flex-1 text-white py-2 rounded-lg text-sm font-semibold ${timerType === 'countdown' ? 'bg-orange-500 hover:bg-orange-600' : 'bg-purple-500 hover:bg-purple-600'}`}>
+                  Start Timer
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -606,7 +722,7 @@ export function ShiftTracker() {
             <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
               <Stat label="Duration" value={elapsedTime} color="indigo" />
               <Stat label="Docs" value={`${completedDocs}/${totalDocs}`} color="green" />
-              {lunchStartTime && <Stat label="Lunch" value={lunchElapsed} color="orange" />}
+              {lunchStartTime && <Stat label="Lunch left" value={lunchElapsed} color="orange" />}
               {pendingAlerts.length > 0 && (
                 <div className="bg-yellow-50 border border-yellow-200 px-2.5 py-1.5 rounded-lg flex-shrink-0">
                   <p className="text-[10px] text-gray-500 leading-tight">Alerts</p>
@@ -671,11 +787,13 @@ export function ShiftTracker() {
                   key={room.id}
                   room={room}
                   hourlySlots={HOURLY_SLOTS}
+                  shiftStartHour={settings.shiftStartHour}
                   onToggleDoc={toggleDoc}
                   onUpdateRoom={updateRoom}
                   onUpdateHourlyData={updateHourlyData}
+                  onToggleSlotComplete={toggleSlotComplete}
                   onRemoveRoom={removeRoom}
-                  canRemoveRoom={true}
+                  onAddNote={addNote}
                 />
               ))}
             </div>

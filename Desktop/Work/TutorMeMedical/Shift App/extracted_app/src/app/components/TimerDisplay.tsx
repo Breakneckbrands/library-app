@@ -18,7 +18,7 @@ interface TimerDisplayProps {
 }
 
 export function TimerDisplay({ timer, onRemove, onAlarmFire }: TimerDisplayProps) {
-  const [display, setDisplay] = useState('00:00');
+  const [display, setDisplay] = useState('0:00');
   const [urgent, setUrgent] = useState(false);
   const [done, setDone] = useState(false);
   const firedRef = useRef(false);
@@ -31,23 +31,28 @@ export function TimerDisplay({ timer, onRemove, onAlarmFire }: TimerDisplayProps
   useEffect(() => {
     const update = () => {
       const elapsed = Date.now() - timer.startTime.getTime();
+      const fmt = (ms: number) => {
+        const totalS = Math.floor(ms / 1000);
+        const h = Math.floor(totalS / 3600);
+        const m = Math.floor((totalS % 3600) / 60);
+        const s = totalS % 60;
+        const ss = String(s).padStart(2, '0');
+        if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${ss}`;
+        return `${m}:${ss}`; // No leading zero on the first unit
+      };
       if (timer.type === 'countup') {
-        const m = Math.floor(elapsed / 60000);
-        const s = Math.floor((elapsed % 60000) / 1000);
-        setDisplay(`${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+        setDisplay(fmt(elapsed));
       } else {
         const remaining = (timer.targetSeconds! * 1000) - elapsed;
         if (remaining <= 0) {
-          setDisplay('00:00');
+          setDisplay('0:00');
           setUrgent(true);
           setDone(true);
           if (!firedRef.current && !timer.alarmFired) {
             handleAlarmFire();
           }
         } else {
-          const m = Math.floor(remaining / 60000);
-          const s = Math.floor((remaining % 60000) / 1000);
-          setDisplay(`${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+          setDisplay(fmt(remaining));
           setUrgent(remaining < 60000);
         }
       }

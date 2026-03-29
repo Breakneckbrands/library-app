@@ -22,6 +22,8 @@ export interface AppSettings {
   shiftStartHour: number;
   defaultDocs: DocumentationItem[];
   hourlyReminder: boolean;
+  hourlySlot30MinReminder: boolean; // push notification 30 min before each filled slot
+  lunchBreakMinutes: 30 | 60;       // lunch alarm duration
 }
 
 function generateHourlySlots(startHour: number) {
@@ -141,6 +143,35 @@ export function SettingsModal({ settings, onSave, onClose }: SettingsModalProps)
                   className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
                 />
               </label>
+              <label className="flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors">
+                <div>
+                  <span className="font-semibold text-gray-700">30-Min Slot Reminder</span>
+                  <p className="text-xs text-gray-500">Push notification 30 min before each filled hourly slot is due</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={localSettings.hourlySlot30MinReminder ?? false}
+                  onChange={e => setLocalSettings(s => ({ ...s, hourlySlot30MinReminder: e.target.checked }))}
+                  className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
+                />
+              </label>
+              <div className="flex items-center justify-between p-3 rounded-lg border border-gray-200">
+                <div>
+                  <span className="font-semibold text-gray-700">Lunch Break Duration</span>
+                  <p className="text-xs text-gray-500">Alarm fires when lunch time is up</p>
+                </div>
+                <div className="flex gap-2">
+                  {([30, 60] as const).map(min => (
+                    <button
+                      key={min}
+                      onClick={() => setLocalSettings(s => ({ ...s, lunchBreakMinutes: min }))}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-colors ${(localSettings.lunchBreakMinutes ?? 30) === min ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400'}`}
+                    >
+                      {min} min
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
