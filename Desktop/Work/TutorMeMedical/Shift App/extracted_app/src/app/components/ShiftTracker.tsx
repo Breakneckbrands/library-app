@@ -292,25 +292,36 @@ export function ShiftTracker() {
     setRooms(rooms => rooms.map(room => {
       if (room.id !== roomId) return room;
       let newCompletedSlots = { ...room.completedSlots };
+      const affectedHourKeys = new Set<string>();
 
       const newDocs = room.documentation.map(doc => {
         if (parentId && doc.id === parentId && doc.subItems) {
           const newSubItems = doc.subItems.map(s => {
             if (s.id !== docId) return s;
             const newCompleted = !s.completed;
-            if (s.hourKey) newCompletedSlots[s.hourKey] = newCompleted;
+            if (s.hourKey) affectedHourKeys.add(s.hourKey);
             return { ...s, completed: newCompleted };
           });
           return { ...doc, subItems: newSubItems };
         }
         if (doc.id === docId) {
-          const newCompleted = !doc.completed;
-          // Bidirectional sync: mirror completion state to the linked hourly slot
-          if (doc.hourKey) newCompletedSlots[doc.hourKey] = newCompleted;
-          return { ...doc, completed: newCompleted };
+          if (doc.hourKey) affectedHourKeys.add(doc.hourKey);
+          return { ...doc, completed: !doc.completed };
         }
         return doc;
       });
+
+      // A slot is done only when ALL docs/subItems linked to it are done
+      for (const hk of affectedHourKeys) {
+        const allDone = newDocs.every(d => {
+          if (d.hourKey === hk) return d.completed;
+          if (d.subItems?.some(s => s.hourKey === hk)) {
+            return d.subItems!.every(s => s.hourKey !== hk || s.completed);
+          }
+          return true;
+        });
+        newCompletedSlots[hk] = allDone;
+      }
 
       return { ...room, documentation: newDocs, completedSlots: newCompletedSlots };
     }));

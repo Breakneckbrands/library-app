@@ -182,14 +182,17 @@ export function RoomPanel({
       taskHourKey = slot?.key;
     }
 
-    onUpdateRoom(room.id, {
-      documentation: [...room.documentation, {
-        id: `custom-${Date.now()}`,
-        label: timeStr ? `${label} @ ${timeStr}` : label,
-        completed: false,
-        hourKey: taskHourKey,
-      }],
-    });
+    const newDoc = {
+      id: `custom-${Date.now()}`,
+      label: timeStr ? `${label} @ ${timeStr}` : label,
+      completed: false,
+      hourKey: taskHourKey,
+    };
+    // If the linked slot is already marked done, reset it — the new task is independent
+    const slotReset = taskHourKey && room.completedSlots?.[taskHourKey]
+      ? { completedSlots: { ...room.completedSlots, [taskHourKey]: false } }
+      : {};
+    onUpdateRoom(room.id, { documentation: [...room.documentation, newDoc], ...slotReset });
     // If a time was set, also log it as a timestamped note in the right hourly slot
     if (timeStr) {
       onAddNote(room.id, `[Task added] ${label}`, timeStr);
