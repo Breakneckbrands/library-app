@@ -25,6 +25,7 @@ export interface AppSettings {
   hourlySlot30MinReminder: boolean; // push notification 30 min before each filled slot
   lunchBreakMinutes: 30 | 60;       // lunch alarm duration
   addNotesToHourlyActivities: boolean; // auto-populate hourly activity box when a note is added
+  enableRecurringTasks: boolean;    // allow tasks to repeat on an interval (Q1/Q2/Q4/Q6/Q8)
 }
 
 function generateHourlySlots(startHour: number) {
@@ -78,7 +79,7 @@ export function SettingsModal({ settings, onSave, onClose }: SettingsModalProps)
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 bg-gray-50 overflow-x-auto">
+        <div className="flex border-b border-gray-200 bg-gray-50">
           {[
             { id: 'notifications', label: 'Alerts' },
             { id: 'shift', label: 'Shift' },
@@ -88,7 +89,7 @@ export function SettingsModal({ settings, onSave, onClose }: SettingsModalProps)
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
+              className={`flex-1 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -165,6 +166,18 @@ export function SettingsModal({ settings, onSave, onClose }: SettingsModalProps)
                   type="checkbox"
                   checked={localSettings.addNotesToHourlyActivities ?? true}
                   onChange={e => setLocalSettings(s => ({ ...s, addNotesToHourlyActivities: e.target.checked }))}
+                  className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
+                />
+              </label>
+              <label className="flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors">
+                <div>
+                  <span className="font-semibold text-gray-700">Recurring Tasks</span>
+                  <p className="text-xs text-gray-500">When adding a task, choose an interval (Q1–Q8) to auto-schedule repeats across the shift</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={localSettings.enableRecurringTasks ?? false}
+                  onChange={e => setLocalSettings(s => ({ ...s, enableRecurringTasks: e.target.checked }))}
                   className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
                 />
               </label>

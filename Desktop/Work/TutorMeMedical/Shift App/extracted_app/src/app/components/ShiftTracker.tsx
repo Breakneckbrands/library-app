@@ -101,6 +101,7 @@ export function ShiftTracker() {
     hourlySlot30MinReminder: false,
     lunchBreakMinutes: 30,
     addNotesToHourlyActivities: true,
+    enableRecurringTasks: false,
   });
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
@@ -858,6 +859,7 @@ export function ShiftTracker() {
                   room={room}
                   hourlySlots={HOURLY_SLOTS}
                   shiftStartHour={settings.shiftStartHour}
+                  enableRecurringTasks={settings.enableRecurringTasks ?? false}
                   onToggleDoc={toggleDoc}
                   onUpdateRoom={updateRoom}
                   onUpdateHourlyData={updateHourlyData}

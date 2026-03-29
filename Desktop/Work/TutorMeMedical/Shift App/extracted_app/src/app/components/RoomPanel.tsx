@@ -33,6 +33,7 @@ interface RoomPanelProps {
   room: RoomData;
   hourlySlots: Array<{ key: string; label: string }>;
   shiftStartHour: number;
+  enableRecurringTasks?: boolean;
   onToggleDoc: (roomId: string, docId: string, parentId?: string) => void;
   onUpdateRoom: (id: string, updates: Partial<RoomData>) => void;
   onUpdateHourlyData: (roomId: string, key: string, value: string) => void;
@@ -98,6 +99,7 @@ export function RoomPanel({
   room,
   hourlySlots,
   shiftStartHour,
+  enableRecurringTasks = false,
   onToggleDoc,
   onUpdateRoom,
   onUpdateHourlyData,
@@ -107,10 +109,12 @@ export function RoomPanel({
 }: RoomPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Collapsed quick-add task (with optional time)
+  // Collapsed quick-add task (with optional time + recurring)
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddText, setQuickAddText] = useState('');
   const [quickAddTime, setQuickAddTime] = useState('');
+  const [quickAddRecurring, setQuickAddRecurring] = useState(false);
+  const [quickAddInterval, setQuickAddInterval] = useState(4); // hours between recurrences
 
   // Collapsed quick-note
   const [showQuickNote, setShowQuickNote] = useState(false);
@@ -169,35 +173,61 @@ export function RoomPanel({
     const label = quickAddText.trim();
     const timeStr = quickAddTime;
 
-    // Compute the hourly slot key from the time, for bidirectional sync
-    let taskHourKey: string | undefined;
-    if (timeStr) {
-      const h24 = parseInt(timeStr.split(':')[0]);
-      const slot = hourlySlots.find(s => {
-        const isPM = s.key.endsWith('P');
-        const h12 = parseInt(s.key);
-        const slotH24 = isPM ? (h12 === 12 ? 12 : h12 + 12) : (h12 === 12 ? 0 : h12);
-        return slotH24 === h24;
-      });
-      taskHourKey = slot?.key;
+    // Helper: find slot key for a given 24h hour
+    const slotForH24 = (h24: number) => hourlySlots.find(s => {
+      const isPM = s.key.endsWith('P');
+      const h12 = parseInt(s.key);
+      const slotH24 = isPM ? (h12 === 12 ? 12 : h12 + 12) : (h12 === 12 ? 0 : h12);
+      return slotH24 === h24;
+    });
+
+    // Build list of (timeStr, hourKey) pairs — one entry normally, multiple if recurring
+    const occurrences: Array<{ time: string; hourKey: string | undefined }> = [];
+    if (timeStr && quickAddRecurring && enableRecurringTasks) {
+      const startH24 = parseInt(timeStr.split(':')[0]);
+      const startMin = parseInt(timeStr.split(':')[1]);
+      for (let i = 0; i < hourlySlots.length; i++) {
+        const h24 = (startH24 + i * quickAddInterval) % 24;
+        const slot = slotForH24(h24);
+        if (!slot) continue; // not in this shift's grid
+        const hh = String(h24).padStart(2, '0');
+        const mm = String(startMin).padStart(2, '0');
+        occurrences.push({ time: `${hh}:${mm}`, hourKey: slot.key });
+        // Stop once we've wrapped past the shift window
+        if (occurrences.length > 1 && h24 === startH24) break;
+      }
+    } else {
+      const h24 = timeStr ? parseInt(timeStr.split(':')[0]) : undefined;
+      const slot = h24 !== undefined ? slotForH24(h24) : undefined;
+      occurrences.push({ time: timeStr, hourKey: slot?.key });
     }
 
-    const newDoc = {
-      id: `custom-${Date.now()}`,
-      label: timeStr ? `${label} @ ${timeStr}` : label,
+    const newDocs = occurrences.map(({ time, hourKey }, i) => ({
+      id: `custom-${Date.now()}-${i}`,
+      label: time ? `${label} @ ${time}` : label,
       completed: false,
-      hourKey: taskHourKey,
-    };
-    // If the linked slot is already marked done, reset it — the new task is independent
-    const slotReset = taskHourKey && room.completedSlots?.[taskHourKey]
-      ? { completedSlots: { ...room.completedSlots, [taskHourKey]: false } }
-      : {};
-    onUpdateRoom(room.id, { documentation: [...room.documentation, newDoc], ...slotReset });
-    // If a time was set, also log it as a timestamped note in the right hourly slot
-    if (timeStr) {
-      onAddNote(room.id, `[Task added] ${label}`, timeStr);
-    }
-    setQuickAddText(''); setQuickAddTime(''); setShowQuickAdd(false);
+      hourKey,
+    }));
+
+    // Reset any slots that were marked done but now have a new independent task
+    const newCompletedSlots = { ...room.completedSlots };
+    newDocs.forEach(d => {
+      if (d.hourKey && newCompletedSlots[d.hourKey]) {
+        newCompletedSlots[d.hourKey] = false;
+      }
+    });
+
+    onUpdateRoom(room.id, {
+      documentation: [...room.documentation, ...newDocs],
+      completedSlots: newCompletedSlots,
+    });
+
+    // Log a note for each occurrence
+    occurrences.forEach(({ time }) => {
+      if (time) onAddNote(room.id, `[Task added] ${label}`, time);
+    });
+
+    setQuickAddText(''); setQuickAddTime(''); setQuickAddRecurring(false); setShowQuickAdd(false);
   };
 
   const handleQuickNoteSubmit = () => {
@@ -368,8 +398,34 @@ export function RoomPanel({
                       />
                     </label>
                     <button onClick={handleQuickAddSubmit} className="px-4 py-2 bg-indigo-500 text-white text-sm font-semibold rounded-lg hover:bg-indigo-600">Add</button>
-                    <button onClick={() => { setShowQuickAdd(false); setQuickAddText(''); setQuickAddTime(''); }} className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-200 rounded-lg">✕</button>
+                    <button onClick={() => { setShowQuickAdd(false); setQuickAddText(''); setQuickAddTime(''); setQuickAddRecurring(false); }} className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-200 rounded-lg">✕</button>
                   </div>
+                  {enableRecurringTasks && quickAddTime && (
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <label className="flex items-center gap-2 cursor-pointer flex-1">
+                        <input
+                          type="checkbox"
+                          checked={quickAddRecurring}
+                          onChange={e => setQuickAddRecurring(e.target.checked)}
+                          className="w-4 h-4 text-orange-500 rounded focus:ring-orange-400"
+                        />
+                        <span className="text-xs font-semibold text-orange-600">Repeat every</span>
+                      </label>
+                      {quickAddRecurring && (
+                        <select
+                          value={quickAddInterval}
+                          onChange={e => setQuickAddInterval(parseInt(e.target.value))}
+                          className="border border-orange-300 rounded-lg px-2 py-1.5 text-xs font-bold text-orange-700 bg-orange-50 focus:outline-none focus:ring-2 focus:ring-orange-400"
+                        >
+                          <option value={1}>Q1 — 1 hr</option>
+                          <option value={2}>Q2 — 2 hrs</option>
+                          <option value={4}>Q4 — 4 hrs</option>
+                          <option value={6}>Q6 — 6 hrs</option>
+                          <option value={8}>Q8 — 8 hrs</option>
+                        </select>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
