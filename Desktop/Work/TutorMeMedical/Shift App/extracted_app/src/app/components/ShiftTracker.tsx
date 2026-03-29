@@ -154,9 +154,9 @@ export function ShiftTracker() {
   // Modal state
   const [showTimerModal, setShowTimerModal] = useState(false);
   const [timerLabel, setTimerLabel] = useState('');
-  const [timerType, setTimerType] = useState<'countup' | 'countdown'>('countup');
-  const [cdMinutes, setCdMinutes] = useState(5);
-  const [cdSeconds, setCdSeconds] = useState(0);
+  const [timerType, setTimerType] = useState<'countup' | 'countdown'>('countdown');
+  const [cdMinutes, setCdMinutes] = useState('');
+  const [cdSeconds, setCdSeconds] = useState('');
 
   const [showUnnamedConfirm, setShowUnnamedConfirm] = useState(false);
   const [showAlertModal, setShowAlertModal] = useState(false);
@@ -436,9 +436,9 @@ export function ShiftTracker() {
   const openTimerModal = useCallback(() => {
     initAudioContext();
     setTimerLabel('');
-    setTimerType('countup');
-    setCdMinutes(5);
-    setCdSeconds(0);
+    setTimerType('countdown');
+    setCdMinutes('');
+    setCdSeconds('');
     setShowUnnamedConfirm(false);
     setShowTimersMenu(false);
     setShowTimerModal(true);
@@ -448,7 +448,9 @@ export function ShiftTracker() {
     const resolvedLabel = forceName ?? (timerLabel.trim() || '');
     if (!resolvedLabel && !showUnnamedConfirm) { setShowUnnamedConfirm(true); return; }
     const finalLabel = resolvedLabel || 'Unnamed Timer';
-    const secs = timerType === 'countdown' ? cdMinutes * 60 + cdSeconds : undefined;
+    const mins = parseInt(cdMinutes) || 0;
+    const secVal = Math.min(59, parseInt(cdSeconds) || 0);
+    const secs = timerType === 'countdown' ? mins * 60 + secVal : undefined;
     if (timerType === 'countdown' && (!secs || secs <= 0)) { toast.error('Set a duration > 0'); return; }
     const startTime = new Date();
     let nativeId: number | undefined;
@@ -594,15 +596,23 @@ export function ShiftTracker() {
                 <div className="flex items-end gap-2">
                   <div className="flex-1">
                     <label className="text-xs text-gray-500">Minutes</label>
-                    <input type="number" min={0} max={999} value={cdMinutes}
-                      onChange={e => setCdMinutes(Math.max(0, parseInt(e.target.value) || 0))}
+                    <input
+                      type="text" inputMode="numeric" pattern="[0-9]*"
+                      placeholder="0"
+                      value={cdMinutes}
+                      onChange={e => { const v = e.target.value.replace(/\D/g, ''); setCdMinutes(v); }}
+                      onFocus={e => e.target.select()}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-center text-xl font-bold focus:outline-none focus:ring-2 focus:ring-orange-400" />
                   </div>
                   <span className="pb-2 font-bold text-gray-400 text-2xl">:</span>
                   <div className="flex-1">
                     <label className="text-xs text-gray-500">Seconds</label>
-                    <input type="number" min={0} max={59} value={cdSeconds}
-                      onChange={e => setCdSeconds(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
+                    <input
+                      type="text" inputMode="numeric" pattern="[0-9]*"
+                      placeholder="00"
+                      value={cdSeconds}
+                      onChange={e => { const v = e.target.value.replace(/\D/g, '').slice(0, 2); setCdSeconds(v); }}
+                      onFocus={e => e.target.select()}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-center text-xl font-bold focus:outline-none focus:ring-2 focus:ring-orange-400" />
                   </div>
                 </div>
