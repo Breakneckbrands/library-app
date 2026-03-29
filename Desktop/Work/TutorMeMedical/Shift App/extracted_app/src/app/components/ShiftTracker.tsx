@@ -100,6 +100,7 @@ export function ShiftTracker() {
     hourlyReminder: false,
     hourlySlot30MinReminder: false,
     lunchBreakMinutes: 30,
+    addNotesToHourlyActivities: true,
   });
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
@@ -381,14 +382,30 @@ export function ShiftTracker() {
       const slotH24 = isPM ? (h12 === 12 ? 12 : h12 + 12) : (h12 === 12 ? 0 : h12);
       return slotH24 === h24;
     });
+    const hourKey = slot?.key ?? `${h24}`;
     const note: ShiftNote = {
       id: Date.now().toString(),
       text,
       enteredAt,
-      hourKey: slot?.key ?? `${h24}`,
+      hourKey,
     };
-    setRooms(rooms => rooms.map(r => r.id === roomId ? { ...r, notes: [...(r.notes || []), note] } : r));
-  }, [HOURLY_SLOTS]);
+    setRooms(rooms => rooms.map(r => {
+      if (r.id !== roomId) return r;
+      const updatedNotes = [...(r.notes || []), note];
+      // If setting enabled, also append the note text to the hourly activity box
+      if (settings.addNotesToHourlyActivities ?? true) {
+        const existing = r.hourlyData[hourKey]?.trim() ?? '';
+        const timeLabel = new Date(enteredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const newEntry = `${timeLabel}: ${text}`;
+        const updatedHourlyData = {
+          ...r.hourlyData,
+          [hourKey]: existing ? `${existing}\n${newEntry}` : newEntry,
+        };
+        return { ...r, notes: updatedNotes, hourlyData: updatedHourlyData };
+      }
+      return { ...r, notes: updatedNotes };
+    }));
+  }, [HOURLY_SLOTS, settings.addNotesToHourlyActivities]);
 
   const openTimerModal = useCallback(() => {
     initAudioContext();

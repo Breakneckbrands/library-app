@@ -148,6 +148,14 @@ export function RoomPanel({
   const chartingPercent = total === 0 ? 0 : Math.round((done / total) * 100);
   const pendingSlots = getPendingSlots(hourlySlots, room.hourlyData, completedSlots);
   const colors = cardUrgencyColor(pendingSlots, shiftStartHour);
+
+  // Sort pending slots by urgency (overdue first, then current, then future) for display
+  const sortedPending = [...pendingSlots].sort((a, b) => {
+    const order = { overdue: 0, current: 1, future: 2 };
+    return order[slotUrgency(a.key, shiftStartHour)] - order[slotUrgency(b.key, shiftStartHour)];
+  });
+  const nextSlot = sortedPending[0];
+  const nextSlotText = nextSlot ? room.hourlyData[nextSlot.key]?.trim() : null;
   const hasPending = pendingSlots.length > 0;
 
   const chartBarColor =
@@ -231,13 +239,20 @@ export function RoomPanel({
                 {/* Info columns */}
                 <div className="flex-1 min-w-0 space-y-1.5">
                   {hasPending ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className={`inline-flex items-center gap-1 ${colors.badge} text-white text-[9px] font-bold px-1.5 py-0.5 rounded`}>
-                        {pendingSlots.length} PENDING
-                      </span>
-                      <span className={`text-xs font-semibold ${colors.badgeText} truncate`}>
-                        {pendingSlots.map(s => s.label).join(', ')}
-                      </span>
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`inline-flex items-center gap-1 ${colors.badge} text-white text-[9px] font-bold px-1.5 py-0.5 rounded flex-shrink-0`}>
+                          {pendingSlots.length} PENDING
+                        </span>
+                        <span className={`text-[10px] font-semibold ${colors.badgeText} truncate`}>
+                          {sortedPending.map(s => s.label).join(', ')}
+                        </span>
+                      </div>
+                      {nextSlotText && (
+                        <p className={`text-xs ${colors.text} truncate leading-tight pl-0.5`}>
+                          <span className="font-bold">{nextSlot!.label}:</span> {nextSlotText}
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5">
@@ -348,9 +363,9 @@ export function RoomPanel({
                   />
                 </div>
 
-                {/* Hourly Observations */}
+                {/* Hourly Activities */}
                 <div className="px-4 pb-4 border-t border-gray-100 pt-4">
-                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Hourly Observations</h3>
+                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Hourly Activities</h3>
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-2">
                     {hourlySlots.map(slot => {
                       const isComplete = !!completedSlots[slot.key];
@@ -372,13 +387,13 @@ export function RoomPanel({
                       return (
                         <div key={slot.key} className="flex flex-col gap-1">
                           <label className="text-[10px] font-bold text-gray-500 text-center">{slot.label}</label>
-                          <input
-                            type="text"
+                          <textarea
+                            rows={2}
                             value={room.hourlyData[slot.key] ?? ''}
                             onChange={e => onUpdateHourlyData(room.id, slot.key, e.target.value)}
                             placeholder="—"
                             disabled={isComplete}
-                            className={`text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-center transition-colors ${inputColor}`}
+                            className={`text-xs border rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400 text-center resize-none w-full transition-colors ${inputColor}`}
                           />
                           {hasText && (
                             <button

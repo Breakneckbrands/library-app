@@ -24,6 +24,7 @@ export interface AppSettings {
   hourlyReminder: boolean;
   hourlySlot30MinReminder: boolean; // push notification 30 min before each filled slot
   lunchBreakMinutes: 30 | 60;       // lunch alarm duration
+  addNotesToHourlyActivities: boolean; // auto-populate hourly activity box when a note is added
 }
 
 function generateHourlySlots(startHour: number) {
@@ -152,6 +153,18 @@ export function SettingsModal({ settings, onSave, onClose }: SettingsModalProps)
                   type="checkbox"
                   checked={localSettings.hourlySlot30MinReminder ?? false}
                   onChange={e => setLocalSettings(s => ({ ...s, hourlySlot30MinReminder: e.target.checked }))}
+                  className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
+                />
+              </label>
+              <label className="flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors">
+                <div>
+                  <span className="font-semibold text-gray-700">Notes → Hourly Activities</span>
+                  <p className="text-xs text-gray-500">Auto-fill the matching hourly activity box when a note is added</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={localSettings.addNotesToHourlyActivities ?? true}
+                  onChange={e => setLocalSettings(s => ({ ...s, addNotesToHourlyActivities: e.target.checked }))}
                   className="w-5 h-5 text-indigo-600 rounded focus:ring-indigo-500"
                 />
               </label>
