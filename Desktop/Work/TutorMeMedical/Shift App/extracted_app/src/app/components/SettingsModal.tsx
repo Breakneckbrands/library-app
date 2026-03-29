@@ -78,17 +78,17 @@ export function SettingsModal({ settings, onSave, onClose }: SettingsModalProps)
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 px-6 pt-2 bg-gray-50 overflow-x-auto">
+        <div className="flex border-b border-gray-200 bg-gray-50 overflow-x-auto">
           {[
-            { id: 'notifications', label: 'Notifications' },
-            { id: 'shift', label: 'Shift Setup' },
-            { id: 'docs', label: 'Documentation' },
-            { id: 'backup', label: 'Backup & Restore' },
+            { id: 'notifications', label: 'Alerts' },
+            { id: 'shift', label: 'Shift' },
+            { id: 'docs', label: 'Docs' },
+            { id: 'backup', label: 'Backup' },
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
+              className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'border-indigo-500 text-indigo-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
