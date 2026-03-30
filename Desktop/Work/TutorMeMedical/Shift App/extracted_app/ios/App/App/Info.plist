@@ -30,12 +30,12 @@
 	<array>
 		<string>armv7</string>
 	</array>
+	<!-- iPhone: portrait only (clinical workflow app) -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- iPad: all orientations -->
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -45,5 +45,20 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+
+	<!-- Notification permission usage description (required by App Store) -->
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>Medical Shift Tracker uses notifications to alert you when hourly charting is due, timers expire, and lunch breaks end.</string>
+
+	<!-- Background local notifications for lock screen / Apple Watch delivery -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
+
+	<!-- ITSAppUsesNonExemptEncryption: false skips the export compliance form -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
