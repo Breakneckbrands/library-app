@@ -1,0 +1,11 @@
+@import 'tailwindcss' source(none);
+@source '../**/*.{js,ts,jsx,tsx}';
+
+@import 'tw-animate-css';
+
+/* Register custom font families as Tailwind utilities (font-heading, font-body, font-accent) */
+@theme {
+  --font-heading: 'Roboto Condensed', sans-serif;
+  --font-body: 'Raleway', sans-serif;
+  --font-accent: 'Oswald', sans-serif;
+}
